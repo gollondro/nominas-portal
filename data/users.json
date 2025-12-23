@@ -1,0 +1,22 @@
+{
+  "admin": {
+    "password": "admin123",
+    "role": "admin",
+    "name": "Administrador"
+  },
+  "contratista1": {
+    "password": "contra123",
+    "role": "contratista",
+    "name": "Constructora Norte SpA"
+  },
+  "contratista2": {
+    "password": "contra123",
+    "role": "contratista",
+    "name": "Servicios Integrales Ltda"
+  },
+  "contratista3": {
+    "password": "contra123",
+    "role": "contratista",
+    "name": "Mantención Industrial SA"
+  }
+}

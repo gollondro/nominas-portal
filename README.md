@@ -1,46 +1,54 @@
-# Portal de Nóminas
+# AFEX Portal de Nóminas
 
-Sistema web para gestión de nóminas de contratistas con roles de admin y contratista.
+Sistema web para gestión de nóminas de contratistas con almacenamiento en archivos JSON.
 
-## 🚀 Deploy en Render.com
+## 🚀 Deploy en Render.com (Web Service)
 
-### Opción 1: Deploy desde GitHub (Recomendado)
+### ⚠️ IMPORTANTE: Cambio de tipo de servicio
 
-1. **Sube el proyecto a GitHub**
+Este proyecto ahora requiere un **Web Service** (no Static Site) porque tiene un backend con Express.
+
+### Pasos para deploy:
+
+1. **Sube a GitHub**
    ```bash
    git init
    git add .
-   git commit -m "Initial commit"
+   git commit -m "Portal de nóminas con backend"
    git branch -M main
    git remote add origin https://github.com/TU-USUARIO/nominas-portal.git
    git push -u origin main
    ```
 
-2. **Configura en Render.com**
-   - Ve a [render.com](https://render.com) y crea una cuenta
-   - Click en **"New +"** → **"Static Site"**
-   - Conecta tu cuenta de GitHub
-   - Selecciona el repositorio `nominas-portal`
+2. **En Render.com:**
+   - Click en **"New +"** → **"Web Service"** (NO Static Site)
+   - Conecta tu repositorio de GitHub
    - Configura:
-     - **Name:** `nominas-portal` (o el nombre que prefieras)
-     - **Branch:** `main`
-     - **Build Command:** `npm install && npm run build`
-     - **Publish Directory:** `dist`
-   - Click en **"Create Static Site"**
 
-3. ¡Listo! Tu sitio estará disponible en `https://nominas-portal.onrender.com`
+   | Campo | Valor |
+   |-------|-------|
+   | **Name** | `nominas-portal-afex` |
+   | **Region** | Oregon (US West) o el más cercano |
+   | **Branch** | `main` |
+   | **Runtime** | `Node` |
+   | **Build Command** | `npm install && npm run build` |
+   | **Start Command** | `npm start` |
 
-### Opción 2: Deploy manual
+3. Click en **"Create Web Service"**
 
-1. Construye el proyecto localmente:
-   ```bash
-   npm install
-   npm run build
-   ```
+4. ¡Listo! Tu portal estará en `https://nominas-portal-afex.onrender.com`
 
-2. La carpeta `dist` contiene los archivos estáticos listos para deploy.
+## 📁 Estructura de Archivos de Datos
 
-## 🔐 Credenciales de Acceso
+Los datos se guardan en la carpeta `/data`:
+
+```
+data/
+├── users.json    # Usuarios del sistema
+└── nominas.json  # Nóminas cargadas
+```
+
+## 🔐 Credenciales por Defecto
 
 | Rol | Usuario | Contraseña |
 |-----|---------|------------|
@@ -52,31 +60,16 @@ Sistema web para gestión de nóminas de contratistas con roles de admin y contr
 ## ✨ Funcionalidades
 
 ### Perfil Contratista
-- Subir archivos Excel (.xlsx, .xls) o CSV con nóminas
+- Subir archivos Excel o CSV con nóminas
 - Ver historial de nóminas subidas
 - Ver estado de cada nómina
-- Ver el total CLP de cada nómina
 
 ### Perfil Admin
-- Ver listado completo de todas las nóminas
-- Ver qué contratista subió cada nómina
-- Suma total de todos los montos CLP
+- Ver todas las nóminas de todos los contratistas
 - Cambiar estado: Pendiente → En Proceso → Acreditada → Pagada
+- **Gestión de usuarios**: Crear, ver y eliminar usuarios
+- Ver suma total de todos los montos CLP
 - Ver detalle de cada nómina
-
-## 📊 Formato del Archivo de Nómina
-
-El sistema detecta automáticamente columnas con estos nombres:
-- `CLP`
-- `Monto` / `MONTO`
-- `Total` / `TOTAL`
-- `Sueldo` / `SUELDO`
-
-Ejemplo de estructura:
-| Nombre | RUT | Cargo | CLP |
-|--------|-----|-------|-----|
-| Juan Pérez | 12.345.678-9 | Maestro | 850000 |
-| María González | 11.222.333-4 | Ayudante | 650000 |
 
 ## 🛠️ Desarrollo Local
 
@@ -84,22 +77,41 @@ Ejemplo de estructura:
 # Instalar dependencias
 npm install
 
-# Ejecutar en modo desarrollo
+# Ejecutar en modo desarrollo (frontend + backend)
 npm run dev
+
+# O ejecutar por separado:
+npm run server:dev  # Backend en puerto 3000
+npm run client:dev  # Frontend en puerto 5173
 
 # Construir para producción
 npm run build
 
-# Preview de la build
-npm run preview
+# Ejecutar en producción
+npm start
 ```
 
-## ⚠️ Notas Importantes
+## 📊 API Endpoints
 
-- Los datos se guardan en `localStorage` del navegador
-- Para producción real, implementar un backend con base de datos
-- Las contraseñas están en texto plano (solo para demo)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/login` | Iniciar sesión |
+| GET | `/api/users` | Obtener usuarios |
+| POST | `/api/users` | Crear usuario |
+| DELETE | `/api/users/:username` | Eliminar usuario |
+| GET | `/api/nominas` | Obtener nóminas |
+| POST | `/api/nominas` | Crear nómina |
+| PATCH | `/api/nominas/:id` | Actualizar estado |
+| DELETE | `/api/nominas/:id` | Eliminar nómina |
+
+## ⚠️ Nota sobre Persistencia en Render
+
+En el plan gratuito de Render, el sistema de archivos es efímero (se reinicia periódicamente). Para persistencia permanente, considera:
+
+1. **Render Disk** (plan de pago) - Almacenamiento persistente
+2. **Base de datos externa** - MongoDB Atlas, Supabase, etc.
+3. **Render con PostgreSQL** - Base de datos incluida
 
 ## 📝 Licencia
 
-MIT
+MIT - AFEX Chile
