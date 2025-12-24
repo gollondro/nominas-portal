@@ -11,24 +11,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-
-// Servir archivos estáticos del build de React
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Rutas de datos
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const NOMINAS_FILE = path.join(DATA_DIR, 'nominas.json');
 
-// Asegurar que exista el directorio de datos
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Funciones helper para leer/escribir archivos
 const readJsonFile = (filePath, defaultValue = []) => {
   try {
     if (fs.existsSync(filePath)) {
@@ -52,9 +46,7 @@ const writeJsonFile = (filePath, data) => {
   }
 };
 
-// Inicializar archivos si no existen
 const initializeData = () => {
-  // Usuarios por defecto
   if (!fs.existsSync(USERS_FILE)) {
     const defaultUsers = {
       admin: { password: 'admin123', role: 'admin', name: 'Administrador' },
@@ -66,7 +58,6 @@ const initializeData = () => {
     console.log('✅ Archivo de usuarios creado');
   }
 
-  // Nóminas vacías
   if (!fs.existsSync(NOMINAS_FILE)) {
     writeJsonFile(NOMINAS_FILE, []);
     console.log('✅ Archivo de nóminas creado');
@@ -74,8 +65,6 @@ const initializeData = () => {
 };
 
 initializeData();
-
-// ==================== API ROUTES ====================
 
 // LOGIN
 app.post('/api/login', (req, res) => {
@@ -86,21 +75,16 @@ app.post('/api/login', (req, res) => {
   if (user && user.password === password) {
     res.json({ 
       success: true, 
-      user: { 
-        username, 
-        role: user.role, 
-        name: user.name 
-      } 
+      user: { username, role: user.role, name: user.name } 
     });
   } else {
     res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
   }
 });
 
-// OBTENER USUARIOS (solo admin)
+// USUARIOS
 app.get('/api/users', (req, res) => {
   const users = readJsonFile(USERS_FILE, {});
-  // No enviar contraseñas
   const safeUsers = Object.entries(users).reduce((acc, [key, value]) => {
     acc[key] = { ...value, password: '********' };
     return acc;
@@ -108,7 +92,6 @@ app.get('/api/users', (req, res) => {
   res.json(safeUsers);
 });
 
-// CREAR/ACTUALIZAR USUARIO
 app.post('/api/users', (req, res) => {
   const { username, password, role, name } = req.body;
   
@@ -126,7 +109,6 @@ app.post('/api/users', (req, res) => {
   }
 });
 
-// ELIMINAR USUARIO
 app.delete('/api/users/:username', (req, res) => {
   const { username } = req.params;
   const users = readJsonFile(USERS_FILE, {});
@@ -147,7 +129,7 @@ app.delete('/api/users/:username', (req, res) => {
   }
 });
 
-// OBTENER NÓMINAS
+// NÓMINAS
 app.get('/api/nominas', (req, res) => {
   const { contratista } = req.query;
   let nominas = readJsonFile(NOMINAS_FILE, []);
@@ -159,7 +141,6 @@ app.get('/api/nominas', (req, res) => {
   res.json(nominas);
 });
 
-// CREAR NÓMINA
 app.post('/api/nominas', (req, res) => {
   const nominaData = req.body;
   
@@ -173,11 +154,7 @@ app.post('/api/nominas', (req, res) => {
     id: uuidv4(),
     ...nominaData,
     fechaSubida: new Date().toISOString(),
-    estado: 'pendiente',
-    // Campos adicionales inicializados vacíos
-    numeroOperacion: '',
-    montoRecibido: '',
-    numeroBoleta: ''
+    estado: 'pendiente'
   };
   
   nominas.push(newNomina);
@@ -189,7 +166,7 @@ app.post('/api/nominas', (req, res) => {
   }
 });
 
-// ACTUALIZAR NÓMINA (estado y campos adicionales)
+// ACTUALIZAR NÓMINA (estado y/o data con campos editados por línea)
 app.patch('/api/nominas/:id', (req, res) => {
   const { id } = req.params;
   const updates = req.body;
@@ -201,18 +178,14 @@ app.patch('/api/nominas/:id', (req, res) => {
     return res.status(404).json({ success: false, message: 'Nómina no encontrada' });
   }
   
-  // Actualizar solo los campos enviados
+  // Actualizar estado si viene
   if (updates.estado !== undefined) {
     nominas[index].estado = updates.estado;
   }
-  if (updates.numeroOperacion !== undefined) {
-    nominas[index].numeroOperacion = updates.numeroOperacion;
-  }
-  if (updates.montoRecibido !== undefined) {
-    nominas[index].montoRecibido = updates.montoRecibido;
-  }
-  if (updates.numeroBoleta !== undefined) {
-    nominas[index].numeroBoleta = updates.numeroBoleta;
+  
+  // Actualizar data completa (con campos editados por línea)
+  if (updates.data !== undefined) {
+    nominas[index].data = updates.data;
   }
   
   if (writeJsonFile(NOMINAS_FILE, nominas)) {
@@ -222,7 +195,6 @@ app.patch('/api/nominas/:id', (req, res) => {
   }
 });
 
-// ELIMINAR NÓMINA
 app.delete('/api/nominas/:id', (req, res) => {
   const { id } = req.params;
   
@@ -241,12 +213,10 @@ app.delete('/api/nominas/:id', (req, res) => {
   }
 });
 
-// Ruta catch-all para SPA (React Router)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`
   🚀 Servidor AFEX Nóminas iniciado

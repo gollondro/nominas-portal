@@ -21,7 +21,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [selectedNomina, setSelectedNomina] = useState(null);
   const [editingNomina, setEditingNomina] = useState(null);
-  const [editForm, setEditForm] = useState({ numeroOperacion: '', montoRecibido: '', numeroBoleta: '' });
+  const [editingData, setEditingData] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState('nominas');
@@ -161,13 +161,22 @@ export default function App() {
         return sum + (isNaN(numValue) ? 0 : numValue);
       }, 0);
 
+      // Agregar campos adicionales vacíos a cada registro
+      const dataWithExtras = data.map((row, index) => ({
+        ...row,
+        _id: index,
+        _numeroOperacion: '',
+        _montoRecibido: '',
+        _numeroBoleta: ''
+      }));
+
       const nominaData = {
         filename: file.name,
         contratista: user.username,
         contratistaName: user.name,
         totalCLP,
         registros: data.length,
-        data: data,
+        data: dataWithExtras,
       };
 
       const res = await fetch(`${API_URL}/nominas`, {
@@ -210,28 +219,29 @@ export default function App() {
 
   const handleEditNomina = (nomina) => {
     setEditingNomina(nomina);
-    setEditForm({
-      numeroOperacion: nomina.numeroOperacion || '',
-      montoRecibido: nomina.montoRecibido || '',
-      numeroBoleta: nomina.numeroBoleta || ''
-    });
+    setEditingData(nomina.data.map(row => ({ ...row })));
   };
 
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
+  const handleEditRow = (index, field, value) => {
+    const newData = [...editingData];
+    newData[index] = { ...newData[index], [field]: value };
+    setEditingData(newData);
+  };
+
+  const handleSaveEdit = async () => {
     setSaving(true);
 
     try {
       const res = await fetch(`${API_URL}/nominas/${editingNomina.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({ data: editingData })
       });
 
       if (res.ok) {
-        setNominas(nominas.map(n => n.id === editingNomina.id ? { ...n, ...editForm } : n));
+        setNominas(nominas.map(n => n.id === editingNomina.id ? { ...n, data: editingData } : n));
         setEditingNomina(null);
-        setEditForm({ numeroOperacion: '', montoRecibido: '', numeroBoleta: '' });
+        setEditingData([]);
       } else {
         alert('Error al guardar');
       }
@@ -287,6 +297,11 @@ export default function App() {
   const formatCLP = (value) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  const getOriginalColumns = (data) => {
+    if (!data || data.length === 0) return [];
+    return Object.keys(data[0]).filter(key => !key.startsWith('_'));
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#00A651] flex items-center justify-center">
@@ -295,7 +310,6 @@ export default function App() {
     );
   }
 
-  // Login Screen
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#00A651] via-[#008C45] to-[#006633] flex items-center justify-center p-4">
@@ -343,7 +357,6 @@ export default function App() {
     );
   }
 
-  // Contratista Dashboard
   if (user.role === 'contratista') {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -437,7 +450,6 @@ export default function App() {
     );
   }
 
-  // Admin Dashboard
   const totalGeneral = nominas.reduce((sum, n) => sum + n.totalCLP, 0);
   const nominasPorEstado = {
     pendiente: nominas.filter(n => n.estado === 'pendiente'),
@@ -467,7 +479,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 pt-6">
         <div className="flex gap-2">
           <button onClick={() => setActiveTab('nominas')} className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'nominas' ? 'bg-[#00A651] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
@@ -482,7 +493,6 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === 'nominas' ? (
           <>
-            {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               <div className="bg-[#00A651] rounded-2xl p-6 text-white shadow-lg">
                 <p className="text-white/70 text-sm mb-1">Total General CLP</p>
@@ -504,7 +514,6 @@ export default function App() {
               })}
             </div>
 
-            {/* Table */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-100 bg-gray-50">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -524,10 +533,8 @@ export default function App() {
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Contratista</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Archivo</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Registros</th>
                         <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Total CLP</th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">N° Operación</th>
-                        <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Monto Recibido</th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">N° Boleta</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Estado</th>
                         <th className="text-center px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
                       </tr>
@@ -545,10 +552,8 @@ export default function App() {
                           </td>
                           <td className="px-6 py-4 text-gray-600">{nomina.filename}</td>
                           <td className="px-6 py-4 text-gray-600 text-sm">{formatDate(nomina.fechaSubida)}</td>
+                          <td className="px-6 py-4 text-gray-600">{nomina.registros}</td>
                           <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCLP(nomina.totalCLP)}</td>
-                          <td className="px-6 py-4 text-gray-600">{nomina.numeroOperacion || '-'}</td>
-                          <td className="px-6 py-4 text-right text-gray-600">{nomina.montoRecibido ? formatCLP(parseFloat(nomina.montoRecibido)) : '-'}</td>
-                          <td className="px-6 py-4 text-gray-600">{nomina.numeroBoleta || '-'}</td>
                           <td className="px-6 py-4">
                             <select value={nomina.estado} onChange={(e) => updateEstado(nomina.id, e.target.value)}
                               className={`appearance-none cursor-pointer pl-3 pr-8 py-1.5 rounded-full border text-xs font-medium ${ESTADOS[nomina.estado]?.color || 'bg-gray-100'} focus:outline-none focus:ring-2 focus:ring-[#00A651]/50`}>
@@ -562,7 +567,7 @@ export default function App() {
                               <button onClick={() => setSelectedNomina(nomina)} className="inline-flex items-center gap-1 px-2 py-1.5 text-sm text-[#00A651] hover:bg-[#00A651]/10 rounded-lg font-medium" title="Ver detalle">
                                 <Eye className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleEditNomina(nomina)} className="inline-flex items-center gap-1 px-2 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium" title="Editar campos">
+                              <button onClick={() => handleEditNomina(nomina)} className="inline-flex items-center gap-1 px-2 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium" title="Editar registros">
                                 <Pencil className="w-4 h-4" />
                               </button>
                             </div>
@@ -576,7 +581,6 @@ export default function App() {
             </div>
           </>
         ) : (
-          /* Usuarios Tab */
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -622,10 +626,9 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal Detalle Nómina */}
       {selectedNomina && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNomina(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between bg-[#00A651]">
               <div className="text-white">
                 <h3 className="font-bold">{selectedNomina.filename}</h3>
@@ -635,55 +638,38 @@ export default function App() {
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <div className="p-6 overflow-auto max-h-[60vh]">
+            <div className="p-6 overflow-auto max-h-[70vh]">
               <div className="mb-4 p-4 bg-[#00A651]/10 rounded-xl flex items-center justify-between border border-[#00A651]/20">
                 <span className="text-[#00A651] font-medium">Total CLP:</span>
                 <span className="text-2xl font-bold text-[#00A651]">{formatCLP(selectedNomina.totalCLP)}</span>
               </div>
-              
-              {/* Info adicional */}
-              {(selectedNomina.numeroOperacion || selectedNomina.montoRecibido || selectedNomina.numeroBoleta) && (
-                <div className="mb-4 grid grid-cols-3 gap-4">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">N° Operación</p>
-                    <p className="font-semibold text-gray-800">{selectedNomina.numeroOperacion || '-'}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">Monto Recibido</p>
-                    <p className="font-semibold text-gray-800">{selectedNomina.montoRecibido ? formatCLP(parseFloat(selectedNomina.montoRecibido)) : '-'}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">N° Boleta</p>
-                    <p className="font-semibold text-gray-800">{selectedNomina.numeroBoleta || '-'}</p>
-                  </div>
-                </div>
-              )}
 
               {selectedNomina.data?.length > 0 && (
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100">
                       <tr>
-                        {Object.keys(selectedNomina.data[0]).map((key) => (
+                        {getOriginalColumns(selectedNomina.data).map((key) => (
                           <th key={key} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{key}</th>
                         ))}
+                        <th className="px-4 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-50">N° Operación</th>
+                        <th className="px-4 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-50">Monto Recibido</th>
+                        <th className="px-4 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-50">N° Boleta</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {selectedNomina.data.slice(0, 50).map((row, idx) => (
+                      {selectedNomina.data.map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
-                          {Object.values(row).map((val, i) => (
-                            <td key={i} className="px-4 py-2 text-gray-700 whitespace-nowrap">{val?.toString() || '-'}</td>
+                          {getOriginalColumns(selectedNomina.data).map((key) => (
+                            <td key={key} className="px-4 py-2 text-gray-700 whitespace-nowrap">{row[key]?.toString() || '-'}</td>
                           ))}
+                          <td className="px-4 py-2 text-blue-700 whitespace-nowrap bg-blue-50/50">{row._numeroOperacion || '-'}</td>
+                          <td className="px-4 py-2 text-blue-700 whitespace-nowrap bg-blue-50/50">{row._montoRecibido ? formatCLP(parseFloat(row._montoRecibido)) : '-'}</td>
+                          <td className="px-4 py-2 text-blue-700 whitespace-nowrap bg-blue-50/50">{row._numeroBoleta || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {selectedNomina.data.length > 50 && (
-                    <div className="px-4 py-3 bg-gray-50 text-center text-sm text-gray-500">
-                      Mostrando 50 de {selectedNomina.data.length} registros
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -691,48 +677,82 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal Editar Nómina */}
       {editingNomina && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingNomina(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b flex items-center justify-between bg-[#00A651]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b flex items-center justify-between bg-blue-600">
               <div className="text-white">
-                <h3 className="font-bold">Editar Nómina</h3>
-                <p className="text-sm text-white/80">{editingNomina.filename}</p>
+                <h3 className="font-bold flex items-center gap-2"><Pencil className="w-5 h-5" /> Editar Registros</h3>
+                <p className="text-sm text-white/80">{editingNomina.filename} • {editingNomina.registros} registros</p>
               </div>
-              <button onClick={() => setEditingNomina(null)} className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center">
-                <X className="w-5 h-5 text-white" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleSaveEdit} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 disabled:opacity-50">
+                  {saving ? <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div> : <Save className="w-4 h-4" />}
+                  Guardar Todo
+                </button>
+                <button onClick={() => setEditingNomina(null)} className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center">
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
             </div>
-            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Número de Operación</label>
-                <input type="text" value={editForm.numeroOperacion} onChange={(e) => setEditForm({ ...editForm, numeroOperacion: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50"
-                  placeholder="Ej: 123456" />
+            <div className="p-6 overflow-auto max-h-[75vh]">
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-3 text-left font-semibold text-gray-500 whitespace-nowrap">#</th>
+                      {getOriginalColumns(editingData).map((key) => (
+                        <th key={key} className="px-3 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{key}</th>
+                      ))}
+                      <th className="px-3 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-100">N° Operación</th>
+                      <th className="px-3 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-100">Monto Recibido</th>
+                      <th className="px-3 py-3 text-left font-semibold text-blue-600 whitespace-nowrap bg-blue-100">N° Boleta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {editingData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-gray-400 text-xs">{idx + 1}</td>
+                        {getOriginalColumns(editingData).map((key) => (
+                          <td key={key} className="px-3 py-2 text-gray-700 whitespace-nowrap">{row[key]?.toString() || '-'}</td>
+                        ))}
+                        <td className="px-2 py-1 bg-blue-50/50">
+                          <input 
+                            type="text" 
+                            value={row._numeroOperacion || ''} 
+                            onChange={(e) => handleEditRow(idx, '_numeroOperacion', e.target.value)}
+                            className="w-28 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="N° Op."
+                          />
+                        </td>
+                        <td className="px-2 py-1 bg-blue-50/50">
+                          <input 
+                            type="number" 
+                            value={row._montoRecibido || ''} 
+                            onChange={(e) => handleEditRow(idx, '_montoRecibido', e.target.value)}
+                            className="w-28 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="Monto"
+                          />
+                        </td>
+                        <td className="px-2 py-1 bg-blue-50/50">
+                          <input 
+                            type="text" 
+                            value={row._numeroBoleta || ''} 
+                            onChange={(e) => handleEditRow(idx, '_numeroBoleta', e.target.value)}
+                            className="w-28 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="N° Boleta"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Monto Recibido (CLP)</label>
-                <input type="number" value={editForm.montoRecibido} onChange={(e) => setEditForm({ ...editForm, montoRecibido: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50"
-                  placeholder="Ej: 1500000" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Número de Boleta</label>
-                <input type="text" value={editForm.numeroBoleta} onChange={(e) => setEditForm({ ...editForm, numeroBoleta: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50"
-                  placeholder="Ej: BOL-001234" />
-              </div>
-              <button type="submit" disabled={saving} className="w-full py-3 bg-[#00A651] text-white rounded-lg font-semibold hover:bg-[#008C45] disabled:opacity-50 flex items-center justify-center gap-2">
-                {saving ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Save className="w-4 h-4" />}
-                Guardar Cambios
-              </button>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Modal Nuevo Usuario */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowUserModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
