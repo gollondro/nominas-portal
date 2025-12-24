@@ -3,7 +3,6 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -174,7 +173,11 @@ app.post('/api/nominas', (req, res) => {
     id: uuidv4(),
     ...nominaData,
     fechaSubida: new Date().toISOString(),
-    estado: 'pendiente'
+    estado: 'pendiente',
+    // Campos adicionales inicializados vacíos
+    numeroOperacion: '',
+    montoRecibido: '',
+    numeroBoleta: ''
   };
   
   nominas.push(newNomina);
@@ -186,10 +189,10 @@ app.post('/api/nominas', (req, res) => {
   }
 });
 
-// ACTUALIZAR ESTADO DE NÓMINA
+// ACTUALIZAR NÓMINA (estado y campos adicionales)
 app.patch('/api/nominas/:id', (req, res) => {
   const { id } = req.params;
-  const { estado } = req.body;
+  const updates = req.body;
   
   const nominas = readJsonFile(NOMINAS_FILE, []);
   const index = nominas.findIndex(n => n.id === id);
@@ -198,7 +201,19 @@ app.patch('/api/nominas/:id', (req, res) => {
     return res.status(404).json({ success: false, message: 'Nómina no encontrada' });
   }
   
-  nominas[index].estado = estado;
+  // Actualizar solo los campos enviados
+  if (updates.estado !== undefined) {
+    nominas[index].estado = updates.estado;
+  }
+  if (updates.numeroOperacion !== undefined) {
+    nominas[index].numeroOperacion = updates.numeroOperacion;
+  }
+  if (updates.montoRecibido !== undefined) {
+    nominas[index].montoRecibido = updates.montoRecibido;
+  }
+  if (updates.numeroBoleta !== undefined) {
+    nominas[index].numeroBoleta = updates.numeroBoleta;
+  }
   
   if (writeJsonFile(NOMINAS_FILE, nominas)) {
     res.json({ success: true, nomina: nominas[index] });
