@@ -61,15 +61,24 @@ data/
 
 ### Perfil Contratista
 - Subir archivos Excel o CSV con nóminas
+- **Campos adicionales al cargar nómina:**
+  - País de destino
+  - Email remitente
+  - DNI remitente
+  - RUT remitente
 - Ver historial de nóminas subidas
 - Ver estado de cada nómina
 
 ### Perfil Admin
 - Ver todas las nóminas de todos los contratistas
+- **Visualización de datos del remitente:**
+  - País de destino
+  - Email remitente
+  - DNI y RUT del remitente
 - Cambiar estado: Pendiente → En Proceso → Acreditada → Pagada
 - **Gestión de usuarios**: Crear, ver y eliminar usuarios
 - Ver suma total de todos los montos CLP
-- Ver detalle de cada nómina
+- Ver detalle de cada nómina con información completa
 
 ## 🛠️ Desarrollo Local
 
@@ -100,9 +109,29 @@ npm start
 | POST | `/api/users` | Crear usuario |
 | DELETE | `/api/users/:username` | Eliminar usuario |
 | GET | `/api/nominas` | Obtener nóminas |
-| POST | `/api/nominas` | Crear nómina |
+| POST | `/api/nominas` | Crear nómina (incluye nuevos campos) |
 | PATCH | `/api/nominas/:id` | Actualizar estado |
 | DELETE | `/api/nominas/:id` | Eliminar nómina |
+
+### Campos de Nómina
+
+```json
+{
+  "id": "uuid",
+  "filename": "nomina.xlsx",
+  "contratista": "contratista1",
+  "contratistaName": "Constructora Norte SpA",
+  "totalCLP": 5000000,
+  "registros": 50,
+  "data": [...],
+  "paisDestino": "Perú",
+  "emailRemitente": "contacto@empresa.com",
+  "dniRemitente": "12345678",
+  "rutRemitente": "12.345.678-9",
+  "fechaSubida": "2024-01-15T10:30:00.000Z",
+  "estado": "pendiente"
+}
+```
 
 ## ⚠️ Nota sobre Persistencia en Render
 

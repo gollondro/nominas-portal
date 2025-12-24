@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Users, CheckCircle, Clock, CreditCard, LogOut, Eye, ChevronDown, X, AlertCircle, Shield, UserPlus, Trash2, Save } from 'lucide-react';
+import { Upload, FileSpreadsheet, Users, CheckCircle, Clock, CreditCard, LogOut, Eye, ChevronDown, X, AlertCircle, Shield, UserPlus, Trash2, Save, Globe, Mail, IdCard } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
@@ -11,6 +11,12 @@ const ESTADOS = {
   acreditada: { label: 'Acreditada', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle },
   pagada: { label: 'Pagada', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: CreditCard },
 };
+
+const PAISES = [
+  'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 'Ecuador', 
+  'Paraguay', 'Perú', 'Uruguay', 'Venezuela', 'México', 'Estados Unidos',
+  'España', 'Otro'
+];
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -26,6 +32,14 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ username: '', password: '', name: '', role: 'contratista' });
   const [saving, setSaving] = useState(false);
+  const [nominaForm, setNominaForm] = useState({
+    paisDestino: '',
+    emailRemitente: '',
+    dniRemitente: '',
+    rutRemitente: ''
+  });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('nominas-user');
@@ -129,19 +143,43 @@ export default function App() {
     });
   };
 
-  const handleFileUpload = async (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setSelectedFile(file);
+    setShowUploadForm(true);
+  };
+
+  const handleCancelUpload = () => {
+    setSelectedFile(null);
+    setShowUploadForm(false);
+    setNominaForm({
+      paisDestino: '',
+      emailRemitente: '',
+      dniRemitente: '',
+      rutRemitente: ''
+    });
+  };
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    // Validar campos requeridos
+    if (!nominaForm.paisDestino || !nominaForm.emailRemitente) {
+      alert('Por favor complete los campos País de destino y Email remitente');
+      return;
+    }
 
     setUploading(true);
     setUploadSuccess(false);
 
     try {
       let data;
-      if (file.name.endsWith('.csv')) {
-        data = await parseCSVFile(file);
+      if (selectedFile.name.endsWith('.csv')) {
+        data = await parseCSVFile(selectedFile);
       } else {
-        data = await parseExcelFile(file);
+        data = await parseExcelFile(selectedFile);
       }
 
       const clpColumn = Object.keys(data[0] || {}).find(key => 
@@ -160,12 +198,17 @@ export default function App() {
       }, 0);
 
       const nominaData = {
-        filename: file.name,
+        filename: selectedFile.name,
         contratista: user.username,
         contratistaName: user.name,
         totalCLP,
         registros: data.length,
         data: data,
+        // Nuevos campos
+        paisDestino: nominaForm.paisDestino,
+        emailRemitente: nominaForm.emailRemitente,
+        dniRemitente: nominaForm.dniRemitente,
+        rutRemitente: nominaForm.rutRemitente,
       };
 
       const res = await fetch(`${API_URL}/nominas`, {
@@ -177,6 +220,7 @@ export default function App() {
       if (res.ok) {
         await loadNominas();
         setUploadSuccess(true);
+        handleCancelUpload();
         setTimeout(() => setUploadSuccess(false), 3000);
       } else {
         throw new Error('Error al guardar');
@@ -187,7 +231,6 @@ export default function App() {
     }
 
     setUploading(false);
-    e.target.value = '';
   };
 
   const updateEstado = async (nominaId, nuevoEstado) => {
@@ -332,28 +375,125 @@ export default function App() {
             <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
               <Upload className="w-5 h-5 text-[#00A651]" />Cargar Nueva Nómina
             </h2>
-            <label className="relative block cursor-pointer">
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-              <div className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${uploading ? 'border-[#00A651] bg-green-50' : 'border-gray-300 hover:border-[#00A651] hover:bg-green-50/50'}`}>
-                {uploading ? (
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 border-4 border-[#00A651] border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p className="text-gray-600">Procesando archivo...</p>
+            
+            {!showUploadForm ? (
+              <label className="relative block cursor-pointer">
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileSelect} className="hidden" disabled={uploading} />
+                <div className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${uploading ? 'border-[#00A651] bg-green-50' : 'border-gray-300 hover:border-[#00A651] hover:bg-green-50/50'}`}>
+                  {uploadSuccess ? (
+                    <div className="flex flex-col items-center text-[#00A651]">
+                      <CheckCircle className="w-12 h-12 mb-4" />
+                      <p className="font-semibold">¡Nómina cargada exitosamente!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 mb-2">Arrastra un archivo o haz clic para seleccionar</p>
+                      <p className="text-sm text-gray-400">Formatos: Excel (.xlsx, .xls) o CSV</p>
+                    </>
+                  )}
+                </div>
+              </label>
+            ) : (
+              <form onSubmit={handleFileUpload} className="space-y-6">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                  <FileSpreadsheet className="w-8 h-8 text-[#00A651]" />
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-800">{selectedFile?.name}</p>
+                    <p className="text-sm text-gray-500">Archivo seleccionado</p>
                   </div>
-                ) : uploadSuccess ? (
-                  <div className="flex flex-col items-center text-[#00A651]">
-                    <CheckCircle className="w-12 h-12 mb-4" />
-                    <p className="font-semibold">¡Nómina cargada exitosamente!</p>
+                  <button type="button" onClick={handleCancelUpload} className="p-2 hover:bg-green-100 rounded-lg">
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Globe className="w-4 h-4 inline mr-1" />País de destino *
+                    </label>
+                    <select 
+                      value={nominaForm.paisDestino} 
+                      onChange={(e) => setNominaForm({ ...nominaForm, paisDestino: e.target.value })}
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50 focus:border-[#00A651] transition-all"
+                    >
+                      <option value="">Seleccione un país</option>
+                      {PAISES.map(pais => (
+                        <option key={pais} value={pais}>{pais}</option>
+                      ))}
+                    </select>
                   </div>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 mb-2">Arrastra un archivo o haz clic para seleccionar</p>
-                    <p className="text-sm text-gray-400">Formatos: Excel (.xlsx, .xls) o CSV</p>
-                  </>
-                )}
-              </div>
-            </label>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Mail className="w-4 h-4 inline mr-1" />Email remitente *
+                    </label>
+                    <input 
+                      type="email" 
+                      value={nominaForm.emailRemitente} 
+                      onChange={(e) => setNominaForm({ ...nominaForm, emailRemitente: e.target.value })}
+                      required
+                      placeholder="correo@ejemplo.com"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50 focus:border-[#00A651] transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <IdCard className="w-4 h-4 inline mr-1" />DNI remitente
+                    </label>
+                    <input 
+                      type="text" 
+                      value={nominaForm.dniRemitente} 
+                      onChange={(e) => setNominaForm({ ...nominaForm, dniRemitente: e.target.value })}
+                      placeholder="Número de DNI"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50 focus:border-[#00A651] transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <IdCard className="w-4 h-4 inline mr-1" />RUT remitente
+                    </label>
+                    <input 
+                      type="text" 
+                      value={nominaForm.rutRemitente} 
+                      onChange={(e) => setNominaForm({ ...nominaForm, rutRemitente: e.target.value })}
+                      placeholder="12.345.678-9"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00A651]/50 focus:border-[#00A651] transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    type="button" 
+                    onClick={handleCancelUpload}
+                    className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={uploading}
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#00A651] text-white font-semibold hover:bg-[#008C45] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#00A651]/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5" />
+                        Cargar Nómina
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -381,6 +521,12 @@ export default function App() {
                           <div>
                             <p className="font-semibold text-gray-800">{nomina.filename}</p>
                             <p className="text-sm text-gray-500">{formatDate(nomina.fechaSubida)} • {nomina.registros} registros</p>
+                            {nomina.paisDestino && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                <Globe className="w-3 h-3 inline mr-1" />{nomina.paisDestino}
+                                {nomina.emailRemitente && <span className="ml-2"><Mail className="w-3 h-3 inline mr-1" />{nomina.emailRemitente}</span>}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
@@ -487,8 +633,9 @@ export default function App() {
                       <tr>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Contratista</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Archivo</th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">País Destino</th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Remitente</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Registros</th>
                         <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Total CLP</th>
                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Estado</th>
                         <th className="text-center px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
@@ -506,8 +653,37 @@ export default function App() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-gray-600">{nomina.filename}</td>
+                          <td className="px-6 py-4">
+                            {nomina.paisDestino ? (
+                              <span className="inline-flex items-center gap-1 text-sm text-gray-700">
+                                <Globe className="w-4 h-4 text-gray-400" />
+                                {nomina.paisDestino}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm">
+                              {nomina.emailRemitente && (
+                                <div className="text-gray-700 flex items-center gap-1">
+                                  <Mail className="w-3 h-3 text-gray-400" />
+                                  <span className="truncate max-w-[150px]" title={nomina.emailRemitente}>{nomina.emailRemitente}</span>
+                                </div>
+                              )}
+                              {(nomina.rutRemitente || nomina.dniRemitente) && (
+                                <div className="text-gray-500 text-xs mt-0.5">
+                                  {nomina.rutRemitente && <span>RUT: {nomina.rutRemitente}</span>}
+                                  {nomina.rutRemitente && nomina.dniRemitente && <span className="mx-1">|</span>}
+                                  {nomina.dniRemitente && <span>DNI: {nomina.dniRemitente}</span>}
+                                </div>
+                              )}
+                              {!nomina.emailRemitente && !nomina.rutRemitente && !nomina.dniRemitente && (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-6 py-4 text-gray-600 text-sm">{formatDate(nomina.fechaSubida)}</td>
-                          <td className="px-6 py-4 text-gray-600">{nomina.registros}</td>
                           <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCLP(nomina.totalCLP)}</td>
                           <td className="px-6 py-4">
                             <select value={nomina.estado} onChange={(e) => updateEstado(nomina.id, e.target.value)}
@@ -580,7 +756,7 @@ export default function App() {
       {/* Modal Detalle Nómina */}
       {selectedNomina && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNomina(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between bg-[#00A651]">
               <div className="text-white">
                 <h3 className="font-bold">{selectedNomina.filename}</h3>
@@ -590,11 +766,62 @@ export default function App() {
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <div className="p-6 overflow-auto max-h-[60vh]">
-              <div className="mb-4 p-4 bg-[#00A651]/10 rounded-xl flex items-center justify-between border border-[#00A651]/20">
-                <span className="text-[#00A651] font-medium">Total CLP:</span>
-                <span className="text-2xl font-bold text-[#00A651]">{formatCLP(selectedNomina.totalCLP)}</span>
+            <div className="p-6 overflow-auto max-h-[70vh]">
+              {/* Info de la nómina */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="p-4 bg-[#00A651]/10 rounded-xl border border-[#00A651]/20">
+                  <span className="text-[#00A651] font-medium text-sm">Total CLP:</span>
+                  <p className="text-2xl font-bold text-[#00A651]">{formatCLP(selectedNomina.totalCLP)}</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-gray-500 font-medium text-sm">Registros:</span>
+                  <p className="text-2xl font-bold text-gray-800">{selectedNomina.registros}</p>
+                </div>
               </div>
+
+              {/* Datos del remitente */}
+              {(selectedNomina.paisDestino || selectedNomina.emailRemitente || selectedNomina.dniRemitente || selectedNomina.rutRemitente) && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <IdCard className="w-4 h-4 text-blue-600" />
+                    Información del Remitente
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    {selectedNomina.paisDestino && (
+                      <div>
+                        <span className="text-gray-500 block">País destino</span>
+                        <span className="font-medium text-gray-800 flex items-center gap-1">
+                          <Globe className="w-4 h-4 text-gray-400" />
+                          {selectedNomina.paisDestino}
+                        </span>
+                      </div>
+                    )}
+                    {selectedNomina.emailRemitente && (
+                      <div>
+                        <span className="text-gray-500 block">Email</span>
+                        <span className="font-medium text-gray-800 flex items-center gap-1">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          {selectedNomina.emailRemitente}
+                        </span>
+                      </div>
+                    )}
+                    {selectedNomina.dniRemitente && (
+                      <div>
+                        <span className="text-gray-500 block">DNI</span>
+                        <span className="font-medium text-gray-800">{selectedNomina.dniRemitente}</span>
+                      </div>
+                    )}
+                    {selectedNomina.rutRemitente && (
+                      <div>
+                        <span className="text-gray-500 block">RUT</span>
+                        <span className="font-medium text-gray-800">{selectedNomina.rutRemitente}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tabla de datos */}
               {selectedNomina.data?.length > 0 && (
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm">
